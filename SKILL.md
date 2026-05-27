@@ -1,6 +1,6 @@
 ---
 name: CiteCheck
-description: 检查学术论文引用的准确性、格式规范性和主题匹配度。Use when the user needs to: (1) extract and verify reference lists from academic papers, (2) check citation format compliance (APA, IEEE, GB/T 7714, etc.), (3) verify if cited papers exist and are queryable via Crossref, Google Scholar, or Semantic Scholar, (4) evaluate thematic relevance between citations and the citing paper based on title/abstract/keywords, (5) assess semantic accuracy of in-text citations against source paper content. Supports LaTeX source files (preferred) and PDF (fallback).
+description: This skill should be used when the user asks to "verify citations", "check references", "validate paper citations", or "evaluate reference relevance". It extracts references from LaTeX/PDF papers, checks formatting rules, verifies existence via Crossref/Semantic Scholar APIs, and scores thematic/semantic relevance.
 ---
 
 # 论文引用检查

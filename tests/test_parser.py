@@ -124,3 +124,40 @@ def test_paper_parser_detects_tex_vs_pdf():
     # Just verify the dispatch logic doesn't crash on unknown types
     with pytest.raises(ValueError):
         parser.parse(Path(__file__))  # .py file should raise
+
+
+def test_latex_citation_key_resolution():
+    r"""Ensure \cite{key} maps to correct reference indices."""
+    from citecheck.models import Citation, Reference
+    from citecheck.parser import PaperParser
+
+    parser = PaperParser()
+    # Simulate a simple tex body with citations
+    body = (
+        "Recent advances in biomedical QA \\cite{lee2020biobert,gu2021domain} "
+        "have shown great promise \\cite{wei2022chainofthought}."
+    )
+    citations = parser._extract_latex_citations(body)
+    assert len(citations) == 2
+
+    # First citation has two keys
+    assert citations[0].bib_keys == ["lee2020biobert", "gu2021domain"]
+    # Second citation has one key
+    assert citations[1].bib_keys == ["wei2022chainofthought"]
+
+    # Simulate resolving keys to indices
+    refs = [
+        Reference(index=1, bib_key="lee2020biobert", title="BioBERT"),
+        Reference(index=2, bib_key="gu2021domain", title="PubMedBERT"),
+        Reference(index=3, bib_key="wei2022chainofthought", title="CoT"),
+    ]
+    ref_key_to_index = {r.bib_key: r.index for r in refs if r.bib_key}
+    for cite in citations:
+        indices = []
+        for key in cite.bib_keys:
+            if key in ref_key_to_index:
+                indices.append(ref_key_to_index[key])
+        cite.ref_indices = indices
+
+    assert citations[0].ref_indices == [1, 2]
+    assert citations[1].ref_indices == [3]

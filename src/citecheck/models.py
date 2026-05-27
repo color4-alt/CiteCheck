@@ -30,6 +30,7 @@ class Citation:
     context_before: str = ""
     context_after: str = ""
     raw_marker: str = ""
+    bib_keys: List[str] = field(default_factory=list)
 
 
 @dataclass

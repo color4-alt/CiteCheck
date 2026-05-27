@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import List
 
 from citecheck.models import Citation, Paper, Reference
-from .bibtex_parser import BibTeXParser
-from .pdf_parser import PDFParser
 
 
 class PaperParser:
@@ -23,6 +21,8 @@ class PaperParser:
 
     def _parse_latex_dir(self, directory: Path) -> Paper:
         """Parse a LaTeX project directory."""
+        from .bibtex_parser import BibTeXParser
+
         tex_files = list(directory.glob("*.tex"))
         bib_files = list(directory.glob("*.bib"))
 
@@ -65,6 +65,15 @@ class PaperParser:
             # Try to extract thebibliography from .tex
             paper.references = self._extract_thebibliography(body)
 
+        # Resolve citation ref_indices from bib_keys
+        ref_key_to_index = {r.bib_key: r.index for r in paper.references if r.bib_key}
+        for cite in paper.citations:
+            indices = []
+            for key in cite.bib_keys:
+                if key in ref_key_to_index:
+                    indices.append(ref_key_to_index[key])
+            cite.ref_indices = indices
+
         return paper
 
     def _parse_latex_file(self, path: Path) -> Paper:
@@ -72,6 +81,7 @@ class PaperParser:
 
     def _parse_pdf(self, path: Path) -> Paper:
         """Parse PDF as fallback."""
+        from .pdf_parser import PDFParser
         return PDFParser().parse(path)
 
     def _resolve_inputs(self, directory: Path, tex_content: str) -> str:
@@ -102,6 +112,7 @@ class PaperParser:
                 raw_marker=match.group(0),
                 context_before=context[:mid].replace("\n", " "),
                 context_after=context[mid + len(match.group(0)):].replace("\n", " "),
+                bib_keys=keys,
             ))
         return citations
 

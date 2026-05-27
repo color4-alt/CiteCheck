@@ -79,7 +79,7 @@ def main():
 
     # Step 4: Matching
     print("[4/5] Evaluating relevance...")
-    thematic_results = ThematicMatcher().evaluate(paper)
+    thematic_results = ThematicMatcher(api_key=args.api_key).evaluate(paper)
     avg_thematic = sum(r.score for r in thematic_results) / len(thematic_results) if thematic_results else 0
     print(f"      Thematic relevance avg: {avg_thematic:.2f}")
 
