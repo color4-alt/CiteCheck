@@ -10,7 +10,7 @@
 
 **A portable agent skill + standalone CLI for verifying academic paper citations.**
 
-Extract references from LaTeX or PDF, validate formatting, verify existence via Crossref / Semantic Scholar, and score thematic / semantic relevance — all without requiring an external LLM API key when used as a skill.
+Extract references from LaTeX or PDF, validate formatting, verify existence via Crossref / Semantic Scholar / Google Scholar / WebSearch, and score thematic / semantic relevance using cited paper abstracts — all without requiring an external LLM API key when used as a skill.
 
 <p align="center">
   <img src="https://img.shields.io/badge/agents-Claude%20%7C%20Codex%20%7C%20OpenClaw%20%7C%20Hermes%20%7C%20Gemini%20%7C%20Cursor-blue" alt="Supported Agents">
@@ -78,7 +78,7 @@ Are these citations accurate and relevant?
 
 The agent will:
 1. Call `citecheck` CLI to parse the paper and check formatting
-2. Query Crossref / Semantic Scholar to verify paper existence
+2. Query Crossref → Semantic Scholar → Google Scholar → WebSearch to verify paper existence
 3. Use its own reasoning to evaluate thematic relevance and semantic accuracy
 4. Present a structured Markdown report
 
@@ -139,7 +139,7 @@ positional arguments:
 
 options:
   -o OUTPUT             Output report path (default: citation_check_report.md)
-  --skip-verification   Skip Crossref / Semantic Scholar verification
+  --skip-verification   Skip all online verification (Crossref / Semantic Scholar / Google Scholar / WebSearch)
   --skip-semantic       Skip semantic matching
   --api-key API_KEY     Optional OpenAI key for LLM matching (falls back to heuristics)
   -v, --verbose         Verbose output
@@ -171,7 +171,7 @@ Input (LaTeX / PDF)
          │
          ▼
 ┌─────────────────────┐
-│ 3. Queryability     │  ← Crossref → Semantic Scholar
+│ 3. Queryability     │  ← Crossref → Semantic Scholar → Google Scholar → WebSearch
 └────────┬────────────┘
          │
          ▼
@@ -199,7 +199,8 @@ CiteCheck generates a Markdown report containing:
 - **Summary**: total references, format issues, verified count, average scores
 - **Detailed table**: per-reference status for format / queryable / thematic / semantic
 - **Format issues**: specific problems (missing author, wrong entry type, suspicious year, preprint source, etc.)
-- **Queryability results**: verification status from Crossref / Semantic Scholar
+- **Queryability results**: verification status from Crossref / Semantic Scholar / Google Scholar / WebSearch
+- **Abstract-aware semantic scoring**: semantic match uses the cited paper's abstract when available
 - **Uncited references**: entries in `.bib` never referenced by `\cite{}` in the text
 
 See [`examples/example_report.md`](examples/example_report.md) for a full sample.

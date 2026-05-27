@@ -10,7 +10,7 @@
 
 **一个可移植的 Agent Skill + 独立 CLI 工具，用于验证学术论文引用。**
 
-从 LaTeX 或 PDF 中提取参考文献，验证格式规范，通过 Crossref / Semantic Scholar 核实论文存在性，并评估主题相关性与语义一致性 —— 作为 Skill 使用时**无需任何外部 LLM API Key**。
+从 LaTeX 或 PDF 中提取参考文献，验证格式规范，通过 Crossref / Semantic Scholar / Google Scholar / WebSearch 核实论文存在性，并基于引文论文**摘要**评估主题相关性与语义一致性 —— 作为 Skill 使用时**无需任何外部 LLM API Key**。
 
 <p align="center">
   <img src="https://img.shields.io/badge/支持%20Agent-Claude%20%7C%20Codex%20%7C%20OpenClaw%20%7C%20Hermes%20%7C%20Gemini%20%7C%20Cursor-blue" alt="Supported Agents">
@@ -78,7 +78,7 @@ CiteCheck 首先是一个**跨 Agent Skill**，帮助 AI 编程助手验证论�
 
 Agent 会自动执行：
 1. 调用 `citecheck` CLI 解析论文并检查格式
-2. 查询 Crossref / Semantic Scholar 验证论文存在性
+2. 查询 Crossref → Semantic Scholar → Google Scholar → WebSearch 验证论文存在性
 3. 使用自身推理能力评估主题相关性和语义准确性
 4. 输出结构化 Markdown 报告
 
@@ -139,7 +139,7 @@ citecheck [-h] [-o OUTPUT] [--skip-verification] [--skip-semantic] [--api-key AP
 
 可选参数:
   -o OUTPUT             输出报告路径（默认: citation_check_report.md）
-  --skip-verification   跳过 Crossref / Semantic Scholar 验证
+  --skip-verification   跳过所有在线验证（Crossref / Semantic Scholar / Google Scholar / WebSearch）
   --skip-semantic       跳过语义匹配
   --api-key API_KEY     可选的 OpenAI Key（用于 LLM 匹配，省略则回退到启发式规则）
   -v, --verbose         详细输出
@@ -171,7 +171,7 @@ citecheck [-h] [-o OUTPUT] [--skip-verification] [--skip-semantic] [--api-key AP
          │
          ▼
 ┌─────────────────────┐
-│ 3. 可查询性验证     │  ← Crossref → Semantic Scholar
+│ 3. 可查询性验证     │  ← Crossref → Semantic Scholar → Google Scholar → WebSearch
 └────────┬────────────┘
          │
          ▼
@@ -199,7 +199,8 @@ CiteCheck 生成 Markdown 报告，包含：
 - **摘要**：总参考文献数、格式问题数、验证通过数、平均分
 - **详细表格**：每条参考文献的格式 / 可查询 / 主题 / 语义状态
 - **格式问题**：具体问题（缺失作者、错误条目类型、可疑年份、预印本来源等）
-- **查询结果**：Crossref / Semantic Scholar 验证状态
+- **查询结果**：Crossref / Semantic Scholar / Google Scholar / WebSearch 验证状态
+- **摘要感知语义评分**：语义匹配在可用时使用引文论文的摘要
 - **未引用文献**：`.bib` 中从未被 `\cite{}` 引用过的条目
 
 查看完整示例：[`examples/example_report.md`](examples/example_report.md)
