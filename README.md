@@ -38,19 +38,37 @@ Install CiteCheck as a skill for your coding agent. The agent will automatically
 
 **Step 1 — Install the skill**
 
-| Agent | Install Command / Path |
-|-------|----------------------|
-| **Claude Code** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.claude/skills/citecheck` |
-| **Codex CLI** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.codex/skills/citecheck` |
-| **OpenClaw** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.openclaw/skills/citecheck` |
-| **Hermes** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.hermes/skills/citecheck` |
-| **Gemini CLI** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.gemini/skills/citecheck` |
-| **Cursor** | Copy `skills/citecheck/SKILL.md` → `.cursor/rules/citecheck.mdc` |
+> 🟢 **Easiest way — just ask your agent:**
+>
+> ```
+> Install this skill for me: https://github.com/color4-alt/CiteCheck
+> ```
+>
+> Your agent will clone the repo into the correct skill directory automatically.
+
+If you prefer to install manually:
+
+| Agent | Install Path |
+|-------|-------------|
+| **Claude Code** | `~/.claude/skills/citecheck` |
+| **Codex CLI** | `~/.codex/skills/citecheck` |
+| **OpenClaw** | `~/.openclaw/skills/citecheck` |
+| **Hermes** | `~/.hermes/skills/citecheck` |
+| **Gemini CLI** | `~/.gemini/skills/citecheck` |
+| **Cursor** | `.cursor/rules/citecheck.mdc` (copy `skills/citecheck/SKILL.md`) |
 | **GitHub Copilot** | Append `AGENTS.md` to `.github/copilot-instructions.md` |
 
 **Step 2 — Invoke**
 
-Simply tell your agent:
+Use natural language or a slash command with a file reference:
+
+```
+/citation-verification @main.tex
+/citation-verification @paper.pdf
+/citation-verification @path/to/latex_project/
+```
+
+Or simply tell your agent:
 
 ```
 Check the citations in this paper.

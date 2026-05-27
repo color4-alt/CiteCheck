@@ -38,19 +38,37 @@ CiteCheck 首先是一个**跨 Agent Skill**，帮助 AI 编程助手验证论�
 
 **第一步 — 安装 Skill**
 
-| Agent | 安装命令 / 路径 |
-|-------|----------------|
-| **Claude Code** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.claude/skills/citecheck` |
-| **Codex CLI** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.codex/skills/citecheck` |
-| **OpenClaw** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.openclaw/skills/citecheck` |
-| **Hermes** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.hermes/skills/citecheck` |
-| **Gemini CLI** | `git clone https://github.com/color4-alt/CiteCheck.git ~/.gemini/skills/citecheck` |
-| **Cursor** | 复制 `skills/citecheck/SKILL.md` 内容到 `.cursor/rules/citecheck.mdc` |
-| **GitHub Copilot** | 将 `AGENTS.md` 内容追加到 `.github/copilot-instructions.md` |
+> 🟢 **最简单的方式 — 直接让 Agent 帮你装：**
+>
+> ```
+> 帮我安装这个 skill：https://github.com/color4-alt/CiteCheck
+> ```
+>
+> Agent 会自动克隆仓库到正确的 Skill 目录。
+
+如果你希望手动安装：
+
+| Agent | 安装路径 |
+|-------|---------|
+| **Claude Code** | `~/.claude/skills/citecheck` |
+| **Codex CLI** | `~/.codex/skills/citecheck` |
+| **OpenClaw** | `~/.openclaw/skills/citecheck` |
+| **Hermes** | `~/.hermes/skills/citecheck` |
+| **Gemini CLI** | `~/.gemini/skills/citecheck` |
+| **Cursor** | `.cursor/rules/citecheck.mdc`（复制 `skills/citecheck/SKILL.md` 内容） |
+| **GitHub Copilot** | 将 `AGENTS.md` 追加到 `.github/copilot-instructions.md` |
 
 **第二步 — 调用**
 
-直接告诉你的 Agent：
+使用自然语言或带文件引用的斜杠命令：
+
+```
+/citation-verification @main.tex
+/citation-verification @paper.pdf
+/citation-verification @path/to/latex_project/
+```
+
+或直接告诉你的 Agent：
 
 ```
 检查这篇论文的引用。
