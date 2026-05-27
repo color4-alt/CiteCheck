@@ -39,7 +39,7 @@ def main():
         "--api-key",
         type=str,
         default=None,
-        help="OpenAI API key for semantic matching (or set OPENAI_API_KEY env var)",
+        help="Optional: OpenAI API key for LLM-powered matching. If omitted, falls back to heuristic rules (no external API calls). Not required when using CiteCheck as a Claude Skill.",
     )
     parser.add_argument(
         "-v", "--verbose",
