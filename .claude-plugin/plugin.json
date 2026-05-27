@@ -1,0 +1,23 @@
+{
+  "name": "citecheck",
+  "description": "Verify academic paper citations: extract references from LaTeX/PDF, check formatting, verify existence via Crossref/Semantic Scholar, and score thematic/semantic relevance.",
+  "version": "0.1.0",
+  "author": {
+    "name": "CiteCheck Team",
+    "email": "citecheck@example.com"
+  },
+  "homepage": "https://github.com/color4-alt/CiteCheck",
+  "repository": "https://github.com/color4-alt/CiteCheck",
+  "license": "MIT",
+  "keywords": [
+    "citations",
+    "academic-papers",
+    "latex",
+    "pdf",
+    "references",
+    "bibliography",
+    "crossref",
+    "semantic-scholar"
+  ],
+  "skills": "./skills/"
+}
