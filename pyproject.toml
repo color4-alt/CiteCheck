@@ -36,9 +36,9 @@ dev = ["pytest>=7.0", "black>=23.0", "ruff>=0.1.0"]
 citecheck = "citecheck.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/CiteCheck"
-Repository = "https://github.com/yourusername/CiteCheck"
-Issues = "https://github.com/yourusername/CiteCheck/issues"
+Homepage = "https://github.com/color4-alt/CiteCheck"
+Repository = "https://github.com/color4-alt/CiteCheck"
+Issues = "https://github.com/color4-alt/CiteCheck/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -70,7 +70,7 @@ def main():
     # Step 3: Queryability
     print("[3/5] Verifying queryability...")
     if args.skip_verification:
-        print("      Skipped (use --skip-verification to enable)")
+        print("      Skipped (--skip-verification flag set)")
         query_results = []
     else:
         query_results = verifier.verify_queryability(paper.references)
