@@ -156,19 +156,22 @@ class PDFParser:
     def _extract_citations(self, body: str) -> List[Citation]:
         """Extract all citation markers from body text.
 
-        Supports three formats:
-        1. Numbered: [n] or [n,m]
-        2. Parenthetical: (Author, Year)
-        3. Narrative: Author (Year)
+        Supported formats:
+        1. Numbered:        [n]  [n,m]  [n-m]
+        2. Superscript:     ¹  ²  ¹²
+        3. Parenthetical:   (Author, Year)  (Author Year)  (A & B, Year)
+        4. Narrative:       Author (Year)   Author et al. (Year)
         """
         citations = []
         seen = set()
 
-        # 1. Numbered citations [n] or [n,m]
-        for match in re.finditer(r"\[(\d+(?:,\s*\d+)*)\]", body):
+        # 1. Numbered citations [n]  [n,m]  [n-m]  [n–m]
+        for match in re.finditer(r"\[([\d\-–,\s]+)\]", body):
             raw = match.group(1)
-            nums = tuple(int(n) for n in re.findall(r"\d+", raw))
-            key = ("numbered", nums)
+            nums = self._parse_number_range(raw)
+            if not nums:
+                continue
+            key = ("numbered", tuple(nums))
             if key in seen:
                 continue
             seen.add(key)
@@ -179,16 +182,49 @@ class PDFParser:
             mid = match.start() - start
 
             citations.append(Citation(
-                ref_indices=list(nums),
+                ref_indices=nums,
                 raw_marker=match.group(0),
                 context_before=ctx[:mid],
                 context_after=ctx[mid + len(match.group(0)):],
             ))
 
-        # 2. Parenthetical citations (Author, Year)
-        # Match patterns like: (Krithara et al., 2022), (Shor, 1994)
+        # 2. Superscript citations (Unicode superscript digits)
+        # Match sequences like ¹, ², ¹², ¹²³
+        super_pattern = re.compile(
+            r"([\u00B9\u00B2\u00B3\u2070-\u2079]+)"
+        )
+        for match in super_pattern.finditer(body):
+            raw = match.group(1)
+            nums = self._parse_superscript_digits(raw)
+            if not nums:
+                continue
+            key = ("super", tuple(nums))
+            if key in seen:
+                continue
+            seen.add(key)
+
+            start = max(0, match.start() - 150)
+            end = min(len(body), match.end() + 150)
+            ctx = body[start:end].replace("\n", " ")
+            mid = match.start() - start
+
+            citations.append(Citation(
+                ref_indices=nums,
+                raw_marker=match.group(0),
+                context_before=ctx[:mid],
+                context_after=ctx[mid + len(match.group(0)):],
+            ))
+
+        # 3. Parenthetical citations (Author, Year)
+        # Covers: (Shor, 1994)  (Shor 1994)  (Krithara et al., 2022)
+        #         (Krithara & Nentidis, 2022)  (Krithara and Nentidis, 2022)
         paren_pattern = re.compile(
-            r"\(\s*([A-Z][A-Za-z\s\.\-&]+?)(?:\s+et\s+al\.?)?\s*,\s*(19\d{2}|20\d{2})\s*\)"
+            r"\(\s*"
+            r"([A-Z][A-Za-z\.\-]*"
+            r"(?:\s+(?:et\s+al\.?|&|and)\s*[A-Za-z\.\-]+)?)"
+            r"\s*,?\s*"
+            r"(19\d{2}|20\d{2})"
+            r"\s*\)"
         )
         for match in paren_pattern.finditer(body):
             author = match.group(1).strip()
@@ -211,10 +247,15 @@ class PDFParser:
                 bib_keys=[f"{author}|{year}"],
             ))
 
-        # 3. Narrative citations Author (Year)
-        # Match patterns like: Krithara et al. (2022), Shor (1994)
+        # 4. Narrative citations Author (Year)
+        # Covers: Shor (1994)  Krithara et al. (2022)
+        #         Krithara & Nentidis (2022)
         narrative_pattern = re.compile(
-            r"([A-Z][A-Za-z\s\.\-&]+?)(?:\s+et\s+al\.?)?\s+\((19\d{2}|20\d{2})\)"
+            r"([A-Z][A-Za-z\.\-]*"
+            r"(?:\s+(?:et\s+al\.?|&|and)\s*[A-Za-z\.\-]+)?)"
+            r"\s+\("
+            r"(19\d{2}|20\d{2})"
+            r"\)"
         )
         for match in narrative_pattern.finditer(body):
             author = match.group(1).strip()
@@ -239,6 +280,44 @@ class PDFParser:
 
         return citations
 
+    @staticmethod
+    def _parse_number_range(raw: str) -> List[int]:
+        """Parse citation range like '1' '1, 2' '1-3' '1–3' into list of ints."""
+        nums = []
+        # Split by comma first
+        parts = [p.strip() for p in raw.split(",")]
+        for part in parts:
+            # Check for range (dash or en-dash)
+            if "-" in part or "–" in part:
+                # Normalize en-dash to dash
+                part = part.replace("–", "-")
+                try:
+                    start, end = part.split("-", 1)
+                    start, end = int(start.strip()), int(end.strip())
+                    nums.extend(range(start, end + 1))
+                except ValueError:
+                    continue
+            else:
+                try:
+                    nums.append(int(part))
+                except ValueError:
+                    continue
+        return nums
+
+    @staticmethod
+    def _parse_superscript_digits(text: str) -> List[int]:
+        """Convert Unicode superscript digits to regular ints."""
+        mapping = {
+            "\u2070": "0", "\u00B9": "1", "\u00B2": "2", "\u00B3": "3",
+            "\u2074": "4", "\u2075": "5", "\u2076": "6",
+            "\u2077": "7", "\u2078": "8", "\u2079": "9",
+        }
+        digits = "".join(mapping.get(ch, "") for ch in text)
+        if not digits:
+            return []
+        # Each digit is a separate citation index
+        return [int(d) for d in digits]
+
     def _resolve_author_year_citations(self, paper: Paper) -> None:
         """Map (Author, Year) citations to reference indices."""
         if not paper.references or not paper.citations:
@@ -250,13 +329,18 @@ class PDFParser:
             if ref.authors and ref.year:
                 # Extract last name of first author
                 first_author = ref.authors.split(",")[0].strip()
+                # Strip common suffixes like "et al.", "and others", "and colleagues"
+                first_author = re.sub(
+                    r"\s+(?:et\s+al\.?|and\s+others?|and\s+colleagues?)\s*$",
+                    "", first_author, flags=re.I,
+                )
                 last_name = first_author.split()[-1] if first_author else ""
                 if last_name:
                     ref_lookup[(last_name.lower(), ref.year)] = ref.index
 
         for cite in paper.citations:
             if cite.ref_indices:
-                continue  # Already resolved (numbered citation)
+                continue  # Already resolved (numbered or superscript citation)
             if not cite.bib_keys:
                 continue
 
@@ -264,6 +348,11 @@ class PDFParser:
                 if "|" not in key:
                     continue
                 author_part, year = key.split("|", 1)
+                # Strip "et al.", "and others" etc. before matching
+                author_part = re.sub(
+                    r"\s+(?:et\s+al\.?|and\s+others?|and\s+colleagues?)\s*$",
+                    "", author_part, flags=re.I,
+                )
                 # Try to match by last name
                 author_last = author_part.split()[-1].lower() if author_part else ""
                 if (author_last, year) in ref_lookup:

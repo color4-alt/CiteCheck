@@ -1,6 +1,7 @@
 @./skills/citecheck/SKILL.md
 @./references/api-reference.md
 @./references/format-check-rules.md
+@./references/thematic-scoring-prompt.md
 @./references/semantic-matching-prompt.md
 
 # CiteCheck — Development & Testing Rules

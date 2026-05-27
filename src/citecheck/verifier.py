@@ -1,4 +1,4 @@
-"""Citation verification via Crossref, Semantic Scholar, Google Scholar, and WebSearch."""
+"""Citation verification via Crossref, Semantic Scholar, OpenAlex, PubMed, arXiv, dblp, Google Scholar, and WebSearch."""
 
 import time
 import urllib.parse
@@ -68,18 +68,38 @@ class CitationVerifier:
         if ss and ss.found:
             return ss
 
-        # 3. Try Google Scholar (web search)
+        # 3. Try OpenAlex (open academic graph)
+        oa = self._query_openalex(ref)
+        if oa and oa.found:
+            return oa
+
+        # 4. Try PubMed (biomedical/life sciences)
+        pubmed = self._query_pubmed(ref)
+        if pubmed and pubmed.found:
+            return pubmed
+
+        # 5. Try arXiv (preprints)
+        arxiv = self._query_arxiv(ref)
+        if arxiv and arxiv.found:
+            return arxiv
+
+        # 6. Try dblp (computer science)
+        dblp = self._query_dblp(ref)
+        if dblp and dblp.found:
+            return dblp
+
+        # 7. Try Google Scholar (web search)
         gs = self._query_google_scholar(ref)
         if gs and gs.found:
             return gs
 
-        # 4. Final fallback: generic web search
+        # 8. Final fallback: generic web search
         ws = self._query_web_search(ref)
         if ws and ws.found:
             return ws
 
-        # 5. Not found
-        result.message = "Not found via Crossref, Semantic Scholar, Google Scholar, or WebSearch"
+        # 9. Not found
+        result.message = "Not found via Crossref, Semantic Scholar, OpenAlex, PubMed, arXiv, dblp, Google Scholar, or WebSearch"
         return result
 
     def _query_crossref(self, ref: Reference) -> Optional[QueryResult]:
@@ -143,6 +163,202 @@ class CitationVerifier:
         except Exception as e:
             return QueryResult(ref_index=ref.index, source="SemanticScholar", message=str(e))
         return None
+
+    def _query_openalex(self, ref: Reference) -> Optional[QueryResult]:
+        """Query OpenAlex for academic works."""
+        if not ref.title:
+            return None
+        try:
+            encoded = urllib.parse.quote(ref.title)
+            url = f"https://api.openalex.org/works?search={encoded}&per-page=3"
+            resp = self.session.get(url, timeout=15)
+            data = resp.json()
+            results = data.get("results", [])
+            if not results:
+                return None
+
+            item = results[0]
+            matched_title = item.get("display_name", "")
+            matched_year = str(item.get("publication_year", ""))
+            matched_doi = item.get("doi", "").replace("https://doi.org/", "")
+
+            # Venue
+            host = item.get("host_venue", {}) or item.get("primary_location", {})
+            if isinstance(host, dict):
+                venue = host.get("display_name", "")
+            else:
+                venue = ""
+
+            # Abstract (OpenAlex stores inverted index)
+            abstract = ""
+            inv = item.get("abstract_inverted_index")
+            if inv:
+                # Reconstruct approximate abstract text
+                word_positions = []
+                for word, positions in inv.items():
+                    for pos in positions:
+                        word_positions.append((pos, word))
+                word_positions.sort(key=lambda x: x[0])
+                abstract = " ".join(w for _, w in word_positions)
+
+            result = QueryResult(
+                ref_index=ref.index,
+                found=True,
+                source="OpenAlex",
+                matched_title=matched_title,
+                matched_year=matched_year,
+                matched_venue=venue,
+                matched_doi=matched_doi,
+                matched_abstract=abstract,
+            )
+            if ref.year and result.matched_year and ref.year != result.matched_year:
+                result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
+            return result
+        except Exception as e:
+            return QueryResult(ref_index=ref.index, source="OpenAlex", message=str(e))
+
+    def _query_arxiv(self, ref: Reference) -> Optional[QueryResult]:
+        """Query arXiv API for preprints."""
+        if not ref.title:
+            return None
+        try:
+            encoded = urllib.parse.quote(ref.title)
+            url = f"http://export.arxiv.org/api/query?search_query=ti:{encoded}&max_results=3&sortBy=relevance"
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code != 200:
+                return None
+
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(resp.text)
+            # Atom namespace
+            ns = {"atom": "http://www.w3.org/2005/Atom"}
+            entries = root.findall("atom:entry", ns)
+            if not entries:
+                return None
+
+            entry = entries[0]
+            title_elem = entry.find("atom:title", ns)
+            matched_title = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
+
+            published = entry.find("atom:published", ns)
+            matched_year = published.text[:4] if published is not None and published.text else ""
+
+            # arXiv id
+            id_elem = entry.find("atom:id", ns)
+            arxiv_id = id_elem.text.split("/")[-1] if id_elem is not None and id_elem.text else ""
+
+            # DOI may be in arxiv_doi field
+            matched_doi = ""
+            for link in entry.findall("atom:link", ns):
+                if link.get("title") == "doi":
+                    matched_doi = link.get("href", "").replace("https://doi.org/", "")
+                    break
+
+            result = QueryResult(
+                ref_index=ref.index,
+                found=True,
+                source="arXiv",
+                matched_title=matched_title,
+                matched_year=matched_year,
+                matched_doi=matched_doi,
+                message=f"Found via arXiv (ID: {arxiv_id})",
+            )
+            if ref.year and result.matched_year and ref.year != result.matched_year:
+                result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
+            return result
+        except Exception as e:
+            return QueryResult(ref_index=ref.index, source="arXiv", message=str(e))
+
+    def _query_dblp(self, ref: Reference) -> Optional[QueryResult]:
+        """Query dblp for computer science publications."""
+        if not ref.title:
+            return None
+        try:
+            encoded = urllib.parse.quote(ref.title)
+            url = f"https://dblp.org/search/publ/api?q={encoded}&format=json&h=3"
+            resp = self.session.get(url, timeout=15)
+            data = resp.json()
+            hits = data.get("result", {}).get("hits", {}).get("hit", [])
+            if not hits:
+                return None
+
+            hit = hits[0]
+            info = hit.get("info", {})
+            matched_title = info.get("title", "")
+            matched_year = str(info.get("year", ""))
+            matched_venue = info.get("venue", "")
+            matched_doi = info.get("doi", "")
+
+            result = QueryResult(
+                ref_index=ref.index,
+                found=True,
+                source="dblp",
+                matched_title=matched_title,
+                matched_year=matched_year,
+                matched_venue=matched_venue,
+                matched_doi=matched_doi,
+            )
+            if ref.year and result.matched_year and ref.year != result.matched_year:
+                result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
+            return result
+        except Exception as e:
+            return QueryResult(ref_index=ref.index, source="dblp", message=str(e))
+
+    def _query_pubmed(self, ref: Reference) -> Optional[QueryResult]:
+        """Query PubMed E-utilities for biomedical/life sciences papers."""
+        if not ref.title:
+            return None
+        try:
+            encoded = urllib.parse.quote(ref.title)
+            # ESearch: find PMIDs matching the title
+            search_url = (
+                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+                f"?db=pubmed&term={encoded}&retmax=3&retmode=json"
+            )
+            resp = self.session.get(search_url, timeout=15)
+            data = resp.json()
+            idlist = data.get("esearchresult", {}).get("idlist", [])
+            if not idlist:
+                return None
+
+            # ESummary: get details for the top PMID
+            pmid = idlist[0]
+            summary_url = (
+                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+                f"?db=pubmed&id={pmid}&retmode=json"
+            )
+            resp2 = self.session.get(summary_url, timeout=15)
+            sdata = resp2.json()
+            docs = sdata.get("result", {})
+            doc = docs.get(pmid, {})
+            if not doc:
+                return None
+
+            matched_title = doc.get("title", "")
+            matched_year = doc.get("pubdate", "")[:4]  # pubdate is usually "YYYY Mon"
+            matched_venue = doc.get("fulljournalname", "")
+            # DOI may be in articleids
+            matched_doi = ""
+            for aid in doc.get("articleids", []):
+                if aid.get("idtype") == "doi":
+                    matched_doi = aid.get("value", "")
+                    break
+
+            result = QueryResult(
+                ref_index=ref.index,
+                found=True,
+                source="PubMed",
+                matched_title=matched_title,
+                matched_year=matched_year,
+                matched_venue=matched_venue,
+                matched_doi=matched_doi,
+                message=f"Found via PubMed (PMID: {pmid})",
+            )
+            if ref.year and result.matched_year and ref.year != result.matched_year:
+                result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
+            return result
+        except Exception as e:
+            return QueryResult(ref_index=ref.index, source="PubMed", message=str(e))
 
     def _query_google_scholar(self, ref: Reference) -> Optional[QueryResult]:
         """Fallback to Google Scholar web search when APIs fail."""
