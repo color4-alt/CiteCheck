@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import List
 
-from .parser import Citation, Paper, Reference
+from citecheck.models import Citation, Paper, Reference
 
 
 @dataclass

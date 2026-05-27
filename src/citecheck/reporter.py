@@ -3,9 +3,9 @@
 from datetime import datetime
 from typing import List
 
-from .matcher import MatchResult
-from .parser import Citation, Paper, Reference
-from .verifier import QueryResult
+from citecheck.matcher import MatchResult
+from citecheck.models import Citation, Paper, Reference
+from citecheck.verifier import QueryResult
 
 
 class ReportGenerator:

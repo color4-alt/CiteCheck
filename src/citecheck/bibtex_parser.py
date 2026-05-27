@@ -3,7 +3,7 @@
 import re
 from typing import List
 
-from .parser import Reference
+from citecheck.models import Reference
 
 
 class BibTeXParser:
@@ -101,8 +101,6 @@ class BibTeXParser:
             issues.append("Missing author")
         if not ref.year:
             issues.append("Missing year")
-        if not ref.doi and not ref.url:
-            issues.append("Missing DOI/URL")
 
         # Entry type checks
         if ref.entry_type == "article" and not (ref.venue or ref.volume):
@@ -119,7 +117,7 @@ class BibTeXParser:
         if ref.year:
             try:
                 y = int(ref.year)
-                if y > 2030 or y < 1900:
+                if y > 2026 or y < 1900:
                     issues.append(f"Suspicious year: {ref.year}")
             except ValueError:
                 issues.append(f"Invalid year: {ref.year}")

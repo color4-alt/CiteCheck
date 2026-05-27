@@ -59,7 +59,8 @@ def test_bibtex_parser_flags_preprint():
     assert any("Preprint" in issue for issue in refs[0].issues)
 
 
-def test_bibtex_parser_flags_missing_doi():
+def test_bibtex_parser_no_longer_flags_missing_doi():
+    """DOI check removed to reduce noise; verification handles existence."""
     parser = BibTeXParser()
     bib = """\
 @article{nodoi2023,
@@ -70,7 +71,7 @@ def test_bibtex_parser_flags_missing_doi():
 }
 """
     refs = parser.parse(bib)
-    assert any("Missing DOI" in issue for issue in refs[0].issues)
+    assert not any("Missing DOI" in issue for issue in refs[0].issues)
 
 
 def test_bibtex_parser_flags_wrong_entry_type():
@@ -79,17 +80,47 @@ def test_bibtex_parser_flags_wrong_entry_type():
 @inproceedings{shouldbearticle2023,
   title={Published in a Journal},
   author={Author, One},
-  booktitle={Nature},
+  booktitle={BMC bioinformatics},
   year={2023}
 }
 """
     refs = parser.parse(bib)
-    # "Nature" is not flagged as wrong type by current heuristic
     assert refs[0].entry_type == "inproceedings"
+    assert any("@article" in issue for issue in refs[0].issues)
+
+
+def test_bibtex_parser_flags_incomplete_entry():
+    parser = BibTeXParser()
+    bib = """\
+@article{incomplete2023,
+  title={Study on Something Important},
+  year={2023}
+}
+"""
+    refs = parser.parse(bib)
+    assert len(refs) == 1
+    assert any("Missing author" in issue for issue in refs[0].issues)
+    assert any("missing journal" in issue.lower() for issue in refs[0].issues)
+
+
+def test_bibtex_parser_flags_future_year():
+    parser = BibTeXParser()
+    bib = """\
+@article{future2030,
+  title={Advanced Neural Methods},
+  author={Smith, John},
+  journal={Nature Biotechnology},
+  year={2030}
+}
+"""
+    refs = parser.parse(bib)
+    assert len(refs) == 1
+    assert any("Suspicious year" in issue for issue in refs[0].issues)
 
 
 def test_paper_parser_detects_tex_vs_pdf():
+    from pathlib import Path
     parser = PaperParser()
     # Just verify the dispatch logic doesn't crash on unknown types
     with pytest.raises(ValueError):
-        parser.parse(__file__)  # .py file should raise
+        parser.parse(Path(__file__))  # .py file should raise

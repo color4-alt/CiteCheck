@@ -5,7 +5,7 @@ import urllib.parse
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from .parser import Reference
+from citecheck.models import Reference
 
 
 @dataclass

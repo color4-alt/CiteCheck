@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from .parser import Citation, Paper, Reference
+from citecheck.models import Citation, Paper, Reference
 
 
 class PDFParser:
@@ -62,12 +62,41 @@ class PDFParser:
     def _extract_numbered_references(self, ref_section: str) -> List[Reference]:
         """Extract numbered references from text."""
         refs = []
-        # Pattern: [1] Author. Title. Venue, Year.
-        # or: 1. Author. Title. Venue, Year.
+
+        # Strategy 1: BibTeX \bibitem{key} format (common in compiled PDFs)
+        bibitem_pattern = re.compile(
+            r"\\bibitem\{([^}]*)\}(.*?)(?=\\bibitem|$)",
+            re.DOTALL
+        )
+        bibitem_matches = list(bibitem_pattern.finditer(ref_section))
+        if bibitem_matches:
+            for idx, match in enumerate(bibitem_matches, 1):
+                key = match.group(1)
+                raw = " ".join(match.group(2).split())
+                ref = self._parse_reference_text(idx, raw)
+                ref.bib_key = key
+                refs.append(ref)
+            return refs
+
+        # Strategy 2: Numbered [1] or 1. format
         pattern = re.compile(
-            r"(?:^|\n)\[?(\d+)\]?[.\s]+"
+            r"(?:^|\n)\[(\d+)\]\s+"
             r"(.*?)"
-            r"(?=(?:\n\[?\d+\]?[.\s])|$)",
+            r"(?=(?:\n\[\d+\]\s)|$)",
+            re.DOTALL
+        )
+        for match in pattern.finditer(ref_section):
+            idx = int(match.group(1))
+            raw = " ".join(match.group(2).split())
+            refs.append(self._parse_reference_text(idx, raw))
+        if refs:
+            return refs
+
+        # Strategy 3: Fallback to simple numbered list
+        pattern = re.compile(
+            r"(?:^|\n)(\d+)[.\s]+"
+            r"(.*?)"
+            r"(?=(?:\n\d+[.\s])|$)",
             re.DOTALL
         )
         for match in pattern.finditer(ref_section):
@@ -80,25 +109,31 @@ class PDFParser:
         """Parse a single reference text into structured fields."""
         ref = Reference(index=index, raw_text=text)
 
-        # Try to extract year
+        # Try to extract year (4-digit number 19xx or 20xx)
         year_match = re.search(r"\b(19\d{2}|20\d{2})\b", text)
         if year_match:
             ref.year = year_match.group(1)
 
         # Try to split authors and title
-        parts = text.split(". ")
+        # Common patterns:
+        #   Author. Title. Venue, Year.
+        #   Author. \newblock Title. \newblock Venue, Year.
+        text = text.replace("\\newblock", " ")
+        parts = re.split(r"\.\s+", text)
+        parts = [p.strip() for p in parts if p.strip()]
+
         if len(parts) >= 2:
-            ref.authors = parts[0].strip()
+            ref.authors = parts[0]
             # Title is usually before venue/year pattern
             for i in range(1, len(parts)):
                 if year_match and year_match.group(1) in parts[i]:
-                    ref.title = ". ".join(parts[1:i]).strip()
-                    ref.venue = ". ".join(parts[i:]).strip()
+                    ref.title = ". ".join(parts[1:i]).strip(". ")
+                    ref.venue = ". ".join(parts[i:]).strip(". ")
                     break
             if not ref.title:
-                ref.title = parts[1].strip()
+                ref.title = parts[1]
                 if len(parts) > 2:
-                    ref.venue = ". ".join(parts[2:]).strip()
+                    ref.venue = ". ".join(parts[2:]).strip(". ")
 
         ref.issues = self._check_pdf_ref_issues(ref)
         return ref

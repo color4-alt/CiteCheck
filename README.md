@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.jpg" alt="CiteCheck Banner" width="100%">
+</p>
+
 # Paper Citation Check
 
 A command-line tool for verifying academic paper citations. Supports **LaTeX source files** (preferred) and **PDF** (fallback).

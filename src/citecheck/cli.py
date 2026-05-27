@@ -4,10 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from .parser import PaperParser
-from .verifier import CitationVerifier
-from .matcher import ThematicMatcher, SemanticMatcher
-from .reporter import ReportGenerator
+from citecheck.parser import PaperParser
+from citecheck.verifier import CitationVerifier
+from citecheck.matcher import ThematicMatcher, SemanticMatcher
+from citecheck.reporter import ReportGenerator
 
 
 def main():
