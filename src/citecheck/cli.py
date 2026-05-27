@@ -84,7 +84,7 @@ def main():
     print(f"      Thematic relevance avg: {avg_thematic:.2f}")
 
     if not args.skip_semantic and paper.citations:
-        semantic_results = SemanticMatcher(api_key=args.api_key).evaluate(paper)
+        semantic_results = SemanticMatcher(api_key=args.api_key, query_results=query_results).evaluate(paper)
         avg_semantic = sum(r.score for r in semantic_results) / len(semantic_results) if semantic_results else 0
         print(f"      Semantic accuracy avg: {avg_semantic:.2f}")
     else:

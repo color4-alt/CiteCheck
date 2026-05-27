@@ -4,7 +4,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from citecheck.models import Citation, Paper, Reference
 
@@ -172,7 +172,17 @@ class SemanticMatcher(_LLMBase):
 
 Text A (citing text): {citing_text}
 Text B (cited paper title): {cited_title}
+Text C (cited paper abstract): {cited_abstract}
 """
+
+    def __init__(self, api_key: str = None, query_results: Optional[list] = None):
+        super().__init__(api_key)
+        self.query_results = query_results or []
+        self._abstract_map = {}
+        if query_results:
+            for qr in query_results:
+                if qr.matched_abstract:
+                    self._abstract_map[qr.ref_index] = qr.matched_abstract
 
     def evaluate(self, paper: Paper) -> List[MatchResult]:
         """Evaluate semantic match for each unique citation."""
@@ -192,9 +202,11 @@ Text B (cited paper title): {cited_title}
 
     def _llm_score(self, cite: Citation, ref: Reference) -> tuple:
         citing_text = f"{cite.context_before} {cite.raw_marker} {cite.context_after}".strip()
+        cited_abstract = self._abstract_map.get(ref.index, ref.raw_text or "")
         user_prompt = self.USER_PROMPT_TEMPLATE.format(
             citing_text=citing_text or "N/A",
             cited_title=ref.title or "N/A",
+            cited_abstract=cited_abstract or "N/A",
         )
         response = self._call_llm(self.SYSTEM_PROMPT, user_prompt)
         return self._extract_json_score(response)
@@ -203,13 +215,16 @@ Text B (cited paper title): {cited_title}
         """Simple heuristic semantic matching when LLM is unavailable."""
         context = (cite.context_before + " " + cite.context_after).lower()
         title = (ref.title or "").lower()
+        abstract = (self._abstract_map.get(ref.index, ref.raw_text or "")).lower()
 
-        # Direct mention
+        combined_source = title + " " + abstract
+
+        # Direct mention in title
         if any(word in context for word in title.split()[:5]):
             return 0.9, "Title keywords directly mentioned in context"
 
-        # Topic overlap
-        overlap = sum(1 for w in title.split() if len(w) > 4 and w in context)
+        # Topic overlap with title + abstract
+        overlap = sum(1 for w in combined_source.split() if len(w) > 4 and w in context)
         if overlap >= 3:
             return 0.85, f"Strong lexical overlap ({overlap} keywords)"
         if overlap >= 1:

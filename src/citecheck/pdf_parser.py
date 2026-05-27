@@ -34,7 +34,9 @@ class PDFParser:
             body = full_text[:ref_start]
             ref_section = full_text[ref_start:]
             paper.references = self._extract_numbered_references(ref_section)
-            paper.citations = self._extract_numbered_citations(body)
+            paper.citations = self._extract_citations(body)
+            # Resolve author-year citations to reference indices
+            self._resolve_author_year_citations(paper)
         else:
             paper.references = []
             paper.citations = []
@@ -151,16 +153,25 @@ class PDFParser:
             issues.append("Missing venue")
         return issues
 
-    def _extract_numbered_citations(self, body: str) -> List[Citation]:
-        """Extract [n] citation markers from body text."""
+    def _extract_citations(self, body: str) -> List[Citation]:
+        """Extract all citation markers from body text.
+
+        Supports three formats:
+        1. Numbered: [n] or [n,m]
+        2. Parenthetical: (Author, Year)
+        3. Narrative: Author (Year)
+        """
         citations = []
         seen = set()
+
+        # 1. Numbered citations [n] or [n,m]
         for match in re.finditer(r"\[(\d+(?:,\s*\d+)*)\]", body):
             raw = match.group(1)
             nums = tuple(int(n) for n in re.findall(r"\d+", raw))
-            if nums in seen:
+            key = ("numbered", nums)
+            if key in seen:
                 continue
-            seen.add(nums)
+            seen.add(key)
 
             start = max(0, match.start() - 150)
             end = min(len(body), match.end() + 150)
@@ -173,4 +184,93 @@ class PDFParser:
                 context_before=ctx[:mid],
                 context_after=ctx[mid + len(match.group(0)):],
             ))
+
+        # 2. Parenthetical citations (Author, Year)
+        # Match patterns like: (Krithara et al., 2022), (Shor, 1994)
+        paren_pattern = re.compile(
+            r"\(\s*([A-Z][A-Za-z\s\.\-&]+?)(?:\s+et\s+al\.?)?\s*,\s*(19\d{2}|20\d{2})\s*\)"
+        )
+        for match in paren_pattern.finditer(body):
+            author = match.group(1).strip()
+            year = match.group(2)
+            key = ("paren", author, year)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            start = max(0, match.start() - 150)
+            end = min(len(body), match.end() + 150)
+            ctx = body[start:end].replace("\n", " ")
+            mid = match.start() - start
+
+            citations.append(Citation(
+                ref_indices=[],
+                raw_marker=match.group(0),
+                context_before=ctx[:mid],
+                context_after=ctx[mid + len(match.group(0)):],
+                bib_keys=[f"{author}|{year}"],
+            ))
+
+        # 3. Narrative citations Author (Year)
+        # Match patterns like: Krithara et al. (2022), Shor (1994)
+        narrative_pattern = re.compile(
+            r"([A-Z][A-Za-z\s\.\-&]+?)(?:\s+et\s+al\.?)?\s+\((19\d{2}|20\d{2})\)"
+        )
+        for match in narrative_pattern.finditer(body):
+            author = match.group(1).strip()
+            year = match.group(2)
+            key = ("narrative", author, year)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            start = max(0, match.start() - 150)
+            end = min(len(body), match.end() + 150)
+            ctx = body[start:end].replace("\n", " ")
+            mid = match.start() - start
+
+            citations.append(Citation(
+                ref_indices=[],
+                raw_marker=match.group(0),
+                context_before=ctx[:mid],
+                context_after=ctx[mid + len(match.group(0)):],
+                bib_keys=[f"{author}|{year}"],
+            ))
+
         return citations
+
+    def _resolve_author_year_citations(self, paper: Paper) -> None:
+        """Map (Author, Year) citations to reference indices."""
+        if not paper.references or not paper.citations:
+            return
+
+        # Build lookup: (author_last_name, year) -> index
+        ref_lookup = {}
+        for ref in paper.references:
+            if ref.authors and ref.year:
+                # Extract last name of first author
+                first_author = ref.authors.split(",")[0].strip()
+                last_name = first_author.split()[-1] if first_author else ""
+                if last_name:
+                    ref_lookup[(last_name.lower(), ref.year)] = ref.index
+
+        for cite in paper.citations:
+            if cite.ref_indices:
+                continue  # Already resolved (numbered citation)
+            if not cite.bib_keys:
+                continue
+
+            for key in cite.bib_keys:
+                if "|" not in key:
+                    continue
+                author_part, year = key.split("|", 1)
+                # Try to match by last name
+                author_last = author_part.split()[-1].lower() if author_part else ""
+                if (author_last, year) in ref_lookup:
+                    cite.ref_indices.append(ref_lookup[(author_last, year)])
+                    break
+                # Fallback: try partial match
+                for (ref_last, ref_year), idx in ref_lookup.items():
+                    if ref_year == year and (ref_last in author_last or author_last in ref_last):
+                        cite.ref_indices.append(idx)
+                        break

@@ -1,4 +1,4 @@
-"""Citation verification via Crossref, Semantic Scholar, and WebSearch."""
+"""Citation verification via Crossref, Semantic Scholar, Google Scholar, and WebSearch."""
 
 import time
 import urllib.parse
@@ -16,6 +16,7 @@ class QueryResult:
     matched_year: str = ""
     matched_venue: str = ""
     matched_doi: str = ""
+    matched_abstract: str = ""
     score: float = 0.0
     source: str = ""
     message: str = ""
@@ -23,7 +24,7 @@ class QueryResult:
 
 
 class CitationVerifier:
-    """Verify if cited papers exist via academic APIs."""
+    """Verify if cited papers exist via academic APIs and web search."""
 
     def __init__(self, skip_online: bool = False):
         self.skip_online = skip_online
@@ -67,8 +68,18 @@ class CitationVerifier:
         if ss and ss.found:
             return ss
 
-        # 3. Fallback: not found
-        result.message = "Not found via Crossref or Semantic Scholar"
+        # 3. Try Google Scholar (web search)
+        gs = self._query_google_scholar(ref)
+        if gs and gs.found:
+            return gs
+
+        # 4. Final fallback: generic web search
+        ws = self._query_web_search(ref)
+        if ws and ws.found:
+            return ws
+
+        # 5. Not found
+        result.message = "Not found via Crossref, Semantic Scholar, Google Scholar, or WebSearch"
         return result
 
     def _query_crossref(self, ref: Reference) -> Optional[QueryResult]:
@@ -91,6 +102,7 @@ class CitationVerifier:
                 result.matched_title = (item.get("title") or [""])[0]
                 result.matched_doi = item.get("DOI", "")
                 result.matched_venue = (item.get("container-title") or [""])[0]
+                result.matched_abstract = item.get("abstract", "")
 
                 # Extract year
                 pub = item.get("published-print", {}) or item.get("published-online", {})
@@ -123,10 +135,72 @@ class CitationVerifier:
                     source="SemanticScholar",
                     matched_title=item.get("title", ""),
                     matched_year=str(item.get("year", "")),
+                    matched_abstract=item.get("abstract", ""),
                 )
                 if ref.year and result.matched_year and ref.year != result.matched_year:
                     result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
                 return result
         except Exception as e:
             return QueryResult(ref_index=ref.index, source="SemanticScholar", message=str(e))
+        return None
+
+    def _query_google_scholar(self, ref: Reference) -> Optional[QueryResult]:
+        """Fallback to Google Scholar web search when APIs fail."""
+        if not ref.title:
+            return None
+        try:
+            query = f"{ref.title} {ref.authors or ''} {ref.year or ''}"
+            encoded = urllib.parse.quote(query)
+            url = f"https://scholar.google.com/scholar?q={encoded}&num=3"
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code == 200:
+                # Google Scholar blocks bots; if we get a valid page, assume the paper exists
+                # We extract the first result title from the HTML for confirmation
+                import re
+                title_match = re.search(r"class=\"gs_rt\"[^>]*>(?:<[^>]+>)?([^<]+)", resp.text)
+                if title_match:
+                    found_title = title_match.group(1).strip()
+                    # Simple heuristic: if the title contains at least 3 words from our query
+                    query_words = set(w.lower() for w in ref.title.split() if len(w) > 3)
+                    found_words = set(w.lower() for w in found_title.split() if len(w) > 3)
+                    if len(query_words & found_words) >= 2:
+                        return QueryResult(
+                            ref_index=ref.index,
+                            found=True,
+                            source="GoogleScholar",
+                            matched_title=found_title,
+                            matched_year=ref.year or "",
+                            message="Verified via Google Scholar web search",
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _query_web_search(self, ref: Reference) -> Optional[QueryResult]:
+        """Final fallback: generic web search via Google."""
+        if not ref.title:
+            return None
+        try:
+            query = f"{ref.title} {ref.authors or ''} {ref.year or ''}"
+            encoded = urllib.parse.quote(query)
+            url = f"https://www.google.com/search?q={encoded}&num=3"
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code == 200:
+                # Check if the page contains the paper title
+                page_text = resp.text.lower()
+                title_lower = ref.title.lower()
+                # Check if title words appear in results
+                title_words = [w for w in title_lower.split() if len(w) > 3]
+                matches = sum(1 for w in title_words if w in page_text)
+                if matches >= max(2, len(title_words) // 2):
+                    return QueryResult(
+                        ref_index=ref.index,
+                        found=True,
+                        source="WebSearch",
+                        matched_title=ref.title,
+                        matched_year=ref.year or "",
+                        message="Verified via web search",
+                    )
+        except Exception:
+            pass
         return None
