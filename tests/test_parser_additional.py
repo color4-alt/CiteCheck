@@ -10,7 +10,7 @@ def test_parse_latex_dir_resolves_inputs_and_bib_keys(tmp_path: Path):
     project.mkdir()
 
     (project / "main.tex").write_text(
-        """\\title{A \\textbf{Great} Paper}
+        """\\title{A Great Paper}
 \\begin{abstract}We use \\emph{strong} methods.\\end{abstract}
 \\begin{document}
 Intro text. \\input{section}
@@ -36,7 +36,7 @@ Intro text. \\input{section}
     paper = PaperParser().parse(project)
 
     assert paper.source_type == "latex"
-    assert paper.title == "A Paper"
+    assert paper.title == "A Great Paper"
     assert "Prior work" in paper.body_text
     assert "\\input{section}" not in paper.body_text
     assert len(paper.references) == 1

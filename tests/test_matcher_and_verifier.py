@@ -18,20 +18,34 @@ def test_thematic_matcher_heuristics_cover_branches():
     score, _ = matcher._heuristic_score(paper, Reference(index=1, title="BioASQ dataset"))
     assert score == 1.0
 
-    score, _ = matcher._heuristic_score(paper, Reference(index=2, title="Biomedical clinical methods"))
+    score, _ = matcher._heuristic_score(
+        paper,
+        Reference(index=2, title="Biomedical clinical methods"),
+    )
     assert score == 0.8
 
-    score, _ = matcher._heuristic_score(paper, Reference(index=3, title="Prompt reasoning approach"))
+    score, _ = matcher._heuristic_score(
+        paper,
+        Reference(index=3, title="Prompt reasoning approach"),
+    )
     assert score == 0.7
 
 
 def test_semantic_matcher_uses_heuristic_and_abstract_map():
     matcher = SemanticMatcher(
-        query_results=[QueryResult(ref_index=1, matched_abstract="biomedical transformer reasoning")]
+        query_results=[
+            QueryResult(ref_index=1, matched_abstract="biomedical transformer reasoning")
+        ]
     )
     paper = Paper(
         references=[Reference(index=1, title="Transformer Biomedical Model", authors="Doe, Jane")],
-        citations=[Citation(ref_indices=[1], context_before="This biomedical transformer", context_after="is used")],
+        citations=[
+            Citation(
+                ref_indices=[1],
+                context_before="This biomedical transformer",
+                context_after="is used",
+            )
+        ],
     )
 
     results = matcher.evaluate(paper)
