@@ -82,7 +82,7 @@ def test_parse_unsupported_suffix_raises(tmp_path: Path):
 
 def test_parse_pdf_dispatch_calls_pdf_parser(monkeypatch, tmp_path: Path):
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_text("placeholder", encoding="utf-8")
+    pdf_path.write_bytes(b"placeholder")
 
     called = {"value": False}
 

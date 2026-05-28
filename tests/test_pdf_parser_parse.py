@@ -21,7 +21,7 @@ class _FakeDoc(list):
 def test_parse_pdf_end_to_end_with_fake_fitz(monkeypatch, tmp_path: Path):
     parser = PDFParser()
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_text("dummy", encoding="utf-8")
+    pdf_path.write_bytes(b"dummy")
 
     text = (
         "Intro with citation [1].\n"
@@ -44,7 +44,7 @@ def test_parse_pdf_end_to_end_with_fake_fitz(monkeypatch, tmp_path: Path):
 def test_parse_pdf_without_reference_section_returns_empty(monkeypatch, tmp_path: Path):
     parser = PDFParser()
     pdf_path = tmp_path / "paper.pdf"
-    pdf_path.write_text("dummy", encoding="utf-8")
+    pdf_path.write_bytes(b"dummy")
 
     fake_doc = _FakeDoc([_FakePage("No references marker here")])
     fake_fitz = types.SimpleNamespace(open=lambda _: fake_doc)
