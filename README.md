@@ -93,13 +93,13 @@ For users who prefer the command line or need to integrate into CI pipelines.
 **Step 1 — Install the Python package**
 
 ```bash
-pip install CiteCheck
+pip install citecheck-cli
 ```
 
 For PDF support:
 
 ```bash
-pip install CiteCheck[pdf]
+pip install citecheck-cli[pdf]
 ```
 
 Or install from source:

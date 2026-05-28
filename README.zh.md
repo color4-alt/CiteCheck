@@ -93,13 +93,13 @@ Agent 会自动执行：
 **第一步 — 安装 Python 包**
 
 ```bash
-pip install CiteCheck
+pip install citecheck-cli
 ```
 
 如需 PDF 支持：
 
 ```bash
-pip install CiteCheck[pdf]
+pip install citecheck-cli[pdf]
 ```
 
 或从源码安装：
