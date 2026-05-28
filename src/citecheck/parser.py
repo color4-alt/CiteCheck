@@ -28,7 +28,10 @@ class PaperParser:
 
         main_tex = tex_files[0]
         for tf in tex_files:
-            content = tf.read_text(encoding="utf-8", errors="ignore")
+            try:
+                content = tf.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
             if "\\begin{document}" in content:
                 main_tex = tf
                 break
