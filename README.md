@@ -266,6 +266,24 @@ ruff check src/ tests/
 
 ---
 
+## 📝 Changelog
+
+### 0.1.1 (2026-05-28)
+
+**Fixed**
+- PDF Parser: Fixed year extraction for arXiv references — arXiv IDs like `arXiv:2004.05150` were incorrectly parsed as the publication year. Now prefers year at end of citation and skips arXiv ID patterns.
+- Verifier (Crossref): Added title similarity scoring, author overlap check, and false-match rejection. Crossref now evaluates all 3 candidates and rejects matches with similarity < 0.2.
+
+**Added**
+- New query sources: OpenAlex, PubMed, arXiv, dblp
+- Skill quality improvements: externalized prompt templates, added examples, fixed self-contained references
+
+### 0.1.0 (2026-05-27)
+
+- Initial release on PyPI
+
+---
+
 ## 📄 License
 
 MIT License — see [LICENSE](LICENSE).

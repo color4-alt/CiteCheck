@@ -43,4 +43,9 @@ citecheck ../latex_paper/main.pdf --skip-verification --skip-semantic -o /tmp/te
 - [ ] pytest `tests/test_parser.py` passes (8/8)
 - [ ] `python -m citecheck --help` works
 
+### Known Improvements (Post-0.1.0)
+
+- **arXiv year parsing** (`pdf_parser.py`): arXiv IDs like `arXiv:2004.05150` are no longer mistaken for publication years.
+- **Crossref false-match filtering** (`verifier.py`): Low-similarity matches are now rejected; large year mismatches (>2 years) are flagged separately from small mismatches.
+
 If any baseline metric shifts unexpectedly, investigate before pushing.

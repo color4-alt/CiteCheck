@@ -266,6 +266,25 @@ ruff check src/ tests/
 
 ---
 
+## 📝 更新日志
+
+### 0.1.1 (2026-05-28)
+
+**修复**
+- PDF 解析器：修复 arXiv 参考文献年份提取 — arXiv ID（如 `arXiv:2004.05150`）曾被误解析为发表年份。现优先匹配引用末尾的年份，并跳过 arXiv ID 模式。
+- 验证器（Crossref）：增加标题相似度评分、作者重叠检查、低相似度匹配拒绝。Crossref 现评估全部 3 个候选结果并拒绝相似度 < 0.2 的匹配。
+
+**新增**
+- 新增查询源：OpenAlex、PubMed、arXiv、dblp
+- Skill 质量改进：外置 prompt 模板、添加示例、修复自包含引用路径
+
+### 0.1.0 (2026-05-27)
+
+- 首次发布至 PyPI
+
+---
+
 ## 📄 许可证
 
 MIT License — 详见 [LICENSE](LICENSE)。
+
