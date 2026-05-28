@@ -1,7 +1,7 @@
 ---
 name: citecheck
 version: 0.1.0
-description: Use when the user asks to "verify citations", "check references", "validate paper citations", or "evaluate reference relevance". It extracts references from LaTeX/PDF papers, checks formatting rules, verifies existence via Crossref/Semantic Scholar APIs, and scores thematic/semantic relevance.
+description: Use when the user asks to "verify citations", "check references", "validate paper citations", or "evaluate reference relevance". It extracts references from LaTeX/PDF papers, checks formatting rules, verifies existence via Crossref / Semantic Scholar / OpenAlex / PubMed / arXiv / dblp / Google Scholar / WebSearch, and scores thematic/semantic relevance.
 ---
 
 # CiteCheck — Paper Citation Verification
