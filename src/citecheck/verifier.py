@@ -1,5 +1,6 @@
 """Citation verification via Crossref, Semantic Scholar, OpenAlex, PubMed, arXiv, dblp, Google Scholar, and WebSearch."""
 
+import re
 import time
 import urllib.parse
 from dataclasses import dataclass, field
@@ -42,6 +43,43 @@ class CitationVerifier:
         """Run format checks on all references."""
         # Issues are already populated during parsing
         return refs
+
+    @staticmethod
+    def _title_similarity(title_a: str, title_b: str) -> float:
+        """Compute Jaccard-like similarity between two titles (0.0–1.0)."""
+        if not title_a or not title_b:
+            return 0.0
+        # Normalize: lowercase, keep only alphabetic words > 2 chars
+        def _words(t: str) -> set:
+            return set(
+                w.lower()
+                for w in re.findall(r"[A-Za-z]{3,}", t)
+                if w.lower() not in {"the", "and", "for", "with", "using", "from", "via", "based", "towards", "among", "into", "over", "under"}
+            )
+        words_a = _words(title_a)
+        words_b = _words(title_b)
+        if not words_a or not words_b:
+            return 0.0
+        intersection = words_a & words_b
+        union = words_a | words_b
+        return len(intersection) / len(union)
+
+    @staticmethod
+    def _author_overlap(ref_authors: str, api_authors: List[dict]) -> bool:
+        """Check if any author last name from the reference appears in API results."""
+        if not ref_authors or not api_authors:
+            return False
+        # Extract last names from reference (first author only for simplicity)
+        ref_first = ref_authors.split(",")[0].strip()
+        ref_last = ref_first.split()[-1].lower() if ref_first else ""
+        if not ref_last:
+            return False
+        # Check against API authors
+        for author in api_authors:
+            family = author.get("family", "").lower()
+            if family and (family in ref_last or ref_last in family):
+                return True
+        return False
 
     def verify_queryability(self, refs: List[Reference]) -> List[QueryResult]:
         """Verify each reference exists via online queries."""
@@ -111,8 +149,42 @@ class CitationVerifier:
             resp = self.session.get(url, timeout=15)
             data = resp.json()
             items = data.get("message", {}).get("items", [])
-            if items:
-                item = items[0]
+            if not items:
+                return None
+
+            # Score all candidates and pick the best one
+            best_item = None
+            best_score = -1.0
+            for item in items:
+                matched_title = (item.get("title") or [""])[0]
+                title_sim = self._title_similarity(ref.title, matched_title)
+
+                # Extract year
+                pub = item.get("published-print", {}) or item.get("published-online", {})
+                parts = pub.get("date-parts", [[""]])[0]
+                matched_year = str(parts[0]) if parts else ""
+
+                # Compute match score: title similarity + year bonus + author bonus
+                score = title_sim
+                if ref.year and matched_year and ref.year == matched_year:
+                    score += 0.3  # Year match bonus
+                if ref.authors and self._author_overlap(ref.authors, item.get("author", [])):
+                    score += 0.2  # Author overlap bonus
+
+                if score > best_score:
+                    best_score = score
+                    best_item = item
+
+            if best_item and best_score < 0.2:
+                # Too dissimilar — likely matched the wrong paper
+                return QueryResult(
+                    ref_index=ref.index,
+                    source="Crossref",
+                    message=f"Title similarity too low ({best_score:.2f}); possible false match",
+                )
+
+            if best_item:
+                item = best_item
                 result = QueryResult(
                     ref_index=ref.index,
                     found=True,
@@ -130,8 +202,26 @@ class CitationVerifier:
                 result.matched_year = str(parts[0]) if parts else ""
 
                 # Compare with reference
-                if ref.year and result.matched_year and ref.year not in result.matched_year:
-                    result.warnings.append(f"Year mismatch: ref={ref.year}, found={result.matched_year}")
+                title_sim = self._title_similarity(ref.title, result.matched_title)
+                if title_sim < 0.5:
+                    result.warnings.append(f"Low title similarity ({title_sim:.2f}); verify manually")
+
+                if ref.year and result.matched_year:
+                    if ref.year != result.matched_year:
+                        try:
+                            year_diff = abs(int(ref.year) - int(result.matched_year))
+                            if year_diff > 2:
+                                result.warnings.append(
+                                    f"Large year mismatch ({year_diff} years): ref={ref.year}, found={result.matched_year}"
+                                )
+                            else:
+                                result.warnings.append(
+                                    f"Year mismatch: ref={ref.year}, found={result.matched_year}"
+                                )
+                        except ValueError:
+                            result.warnings.append(
+                                f"Year mismatch: ref={ref.year}, found={result.matched_year}"
+                            )
                 return result
         except Exception as e:
             return QueryResult(ref_index=ref.index, source="Crossref", message=str(e))

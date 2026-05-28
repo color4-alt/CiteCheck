@@ -112,7 +112,13 @@ class PDFParser:
         ref = Reference(index=index, raw_text=text)
 
         # Try to extract year (4-digit number 19xx or 20xx)
-        year_match = re.search(r"\b(19\d{2}|20\d{2})\b", text)
+        # Strategy 1: prefer year at the end of the citation (after comma/period)
+        year_match = re.search(r"[,\.]\s*(19\d{2}|20\d{2})\s*[\.\n]?$", text)
+        if not year_match:
+            # Strategy 2: skip arXiv ID patterns like arXiv:2004.05150
+            # by removing arXiv IDs before matching
+            clean_text = re.sub(r"arXiv[:\s]?\d{4}\.\d{4,5}", "", text, flags=re.I)
+            year_match = re.search(r"\b(19\d{2}|20\d{2})\b", clean_text)
         if year_match:
             ref.year = year_match.group(1)
 
@@ -128,7 +134,7 @@ class PDFParser:
             ref.authors = parts[0]
             # Title is usually before venue/year pattern
             for i in range(1, len(parts)):
-                if year_match and year_match.group(1) in parts[i]:
+                if ref.year and ref.year in parts[i]:
                     ref.title = ". ".join(parts[1:i]).strip(". ")
                     ref.venue = ". ".join(parts[i:]).strip(". ")
                     break
