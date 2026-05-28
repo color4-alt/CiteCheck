@@ -161,3 +161,52 @@ def test_latex_citation_key_resolution():
 
     assert citations[0].ref_indices == [1, 2]
     assert citations[1].ref_indices == [3]
+
+
+def test_parse_specific_tex_file_uses_given_entrypoint(tmp_path):
+    parser = PaperParser()
+
+    main_tex = tmp_path / "main.tex"
+    main_tex.write_text(
+        "\\title{Main Paper}\n\\begin{document}Main body\\end{document}",
+        encoding="utf-8",
+    )
+
+    appendix_tex = tmp_path / "appendix.tex"
+    appendix_tex.write_text(
+        "\\title{Appendix Paper}\n\\begin{document}Appendix body\\end{document}",
+        encoding="utf-8",
+    )
+
+    paper = parser.parse(appendix_tex)
+    assert paper.title == "Appendix Paper"
+    assert "Appendix body" in paper.body_text
+
+
+def test_resolve_nested_input_and_avoid_self_recursion(tmp_path):
+    parser = PaperParser()
+
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "section2.tex").write_text("Nested cite \\cite{k1}.", encoding="utf-8")
+    (tmp_path / "section1.tex").write_text(
+        "Section1 text \\input{sub/section2} \\input{section1}",
+        encoding="utf-8",
+    )
+    (tmp_path / "main.tex").write_text(
+        (
+            "\\title{Main Paper}\n"
+            "\\begin{document}\n"
+            "Start \\input{section1}\n"
+            "\\begin{thebibliography}{9}\n"
+            "\\bibitem{k1} Example Reference.\n"
+            "\\end{thebibliography}\n"
+            "\\end{document}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    paper = parser.parse(tmp_path / "main.tex")
+
+    assert len(paper.citations) == 1
+    assert paper.citations[0].bib_keys == ["k1"]
+    assert paper.citations[0].ref_indices == [1]

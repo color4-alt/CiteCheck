@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Set
 
 from citecheck.models import Citation, Paper, Reference
 
@@ -21,10 +21,7 @@ class PaperParser:
 
     def _parse_latex_dir(self, directory: Path) -> Paper:
         """Parse a LaTeX project directory."""
-        from .bibtex_parser import BibTeXParser
-
         tex_files = list(directory.glob("*.tex"))
-        bib_files = list(directory.glob("*.bib"))
 
         if not tex_files:
             raise FileNotFoundError(f"No .tex file found in {directory}")
@@ -36,6 +33,15 @@ class PaperParser:
                 main_tex = tf
                 break
 
+        return self._parse_latex_project(directory, main_tex)
+
+    def _parse_latex_file(self, path: Path) -> Paper:
+        return self._parse_latex_project(path.parent, path)
+
+    def _parse_latex_project(self, directory: Path, main_tex: Path) -> Paper:
+        from .bibtex_parser import BibTeXParser
+
+        bib_files = list(directory.glob("*.bib"))
         tex_content = main_tex.read_text(encoding="utf-8", errors="ignore")
         paper = Paper(source_type="latex")
 
@@ -76,25 +82,42 @@ class PaperParser:
 
         return paper
 
-    def _parse_latex_file(self, path: Path) -> Paper:
-        return self._parse_latex_dir(path.parent)
-
     def _parse_pdf(self, path: Path) -> Paper:
         """Parse PDF as fallback."""
         from .pdf_parser import PDFParser
         return PDFParser().parse(path)
 
-    def _resolve_inputs(self, directory: Path, tex_content: str) -> str:
+    def _resolve_inputs(
+        self,
+        directory: Path,
+        tex_content: str,
+        visited: Optional[Set[Path]] = None,
+    ) -> str:
         """Resolve \\input{} directives."""
+        if visited is None:
+            visited = set()
+
         pattern = r"\\input\{([^}]+)\}"
         result = tex_content
         for match in re.finditer(pattern, tex_content):
             input_path = directory / match.group(1)
             if not input_path.suffix:
                 input_path = input_path.with_suffix(".tex")
-            if input_path.exists():
+            input_path = input_path.resolve()
+
+            if input_path in visited:
+                continue
+            if not input_path.exists():
+                continue
+
+            try:
+                visited.add(input_path)
                 sub_content = input_path.read_text(encoding="utf-8", errors="ignore")
-                result = result.replace(match.group(0), sub_content)
+            except OSError:
+                continue
+
+            sub_content = self._resolve_inputs(input_path.parent, sub_content, visited)
+            result = result.replace(match.group(0), sub_content)
         return result
 
     def _extract_latex_citations(self, body: str) -> List[Citation]:
