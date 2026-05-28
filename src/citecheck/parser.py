@@ -113,9 +113,11 @@ class PaperParser:
             except OSError:
                 return match.group(0)
 
-            next_stack = set(stack)
-            next_stack.add(input_path)
-            return self._resolve_inputs(input_path.parent, sub_content, next_stack)
+            stack.add(input_path)
+            try:
+                return self._resolve_inputs(input_path.parent, sub_content, stack)
+            finally:
+                stack.remove(input_path)
 
         return pattern.sub(_replace, tex_content)
 
