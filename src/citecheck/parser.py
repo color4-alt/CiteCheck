@@ -90,10 +90,12 @@ class PaperParser:
         from .pdf_parser import PDFParser
         return PDFParser().parse(path)
 
-    def _resolve_inputs(self, directory: Path, tex_content: str, stack: Optional[Set[Path]] = None) -> str:
+    def _resolve_inputs(
+        self, directory: Path, tex_content: str, visited_paths: Optional[Set[Path]] = None
+    ) -> str:
         """Resolve \\input{} directives."""
-        if stack is None:
-            stack = set()
+        if visited_paths is None:
+            visited_paths = set()
 
         pattern = re.compile(r"\\input\{([^}]+)\}")
 
@@ -103,7 +105,7 @@ class PaperParser:
                 input_path = input_path.with_suffix(".tex")
             input_path = input_path.resolve()
 
-            if input_path in stack:
+            if input_path in visited_paths:
                 return ""
             if not input_path.exists():
                 return match.group(0)
@@ -113,11 +115,11 @@ class PaperParser:
             except OSError:
                 return match.group(0)
 
-            stack.add(input_path)
+            visited_paths.add(input_path)
             try:
-                return self._resolve_inputs(input_path.parent, sub_content, stack)
+                return self._resolve_inputs(input_path.parent, sub_content, visited_paths)
             finally:
-                stack.remove(input_path)
+                visited_paths.remove(input_path)
 
         return pattern.sub(_replace, tex_content)
 

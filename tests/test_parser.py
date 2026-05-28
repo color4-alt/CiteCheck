@@ -183,7 +183,7 @@ def test_parse_specific_tex_file_uses_given_entrypoint(tmp_path):
     assert "Appendix body" in paper.body_text
 
 
-def test_resolve_nested_input_and_avoid_self_recursion(tmp_path):
+def test_resolve_nested_inputs_with_cycle_protection(tmp_path):
     parser = PaperParser()
 
     (tmp_path / "sub").mkdir()
@@ -210,4 +210,5 @@ def test_resolve_nested_input_and_avoid_self_recursion(tmp_path):
     assert len(paper.citations) == 1
     assert paper.citations[0].bib_keys == ["k1"]
     assert paper.citations[0].ref_indices == [1]
+    assert "Section1 text" in paper.body_text
     assert "\\input{section1}" not in paper.body_text
