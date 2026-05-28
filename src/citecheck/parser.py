@@ -90,38 +90,34 @@ class PaperParser:
         from .pdf_parser import PDFParser
         return PDFParser().parse(path)
 
-    def _resolve_inputs(
-        self,
-        directory: Path,
-        tex_content: str,
-        visited: Optional[Set[Path]] = None,
-    ) -> str:
+    def _resolve_inputs(self, directory: Path, tex_content: str, stack: Optional[Set[Path]] = None) -> str:
         """Resolve \\input{} directives."""
-        if visited is None:
-            visited = set()
+        if stack is None:
+            stack = set()
 
-        pattern = r"\\input\{([^}]+)\}"
-        result = tex_content
-        for match in re.finditer(pattern, tex_content):
+        pattern = re.compile(r"\\input\{([^}]+)\}")
+
+        def _replace(match: re.Match) -> str:
             input_path = directory / match.group(1)
             if not input_path.suffix:
                 input_path = input_path.with_suffix(".tex")
             input_path = input_path.resolve()
 
-            if input_path in visited:
-                continue
+            if input_path in stack:
+                return ""
             if not input_path.exists():
-                continue
+                return match.group(0)
 
             try:
-                visited.add(input_path)
                 sub_content = input_path.read_text(encoding="utf-8", errors="ignore")
             except OSError:
-                continue
+                return match.group(0)
 
-            sub_content = self._resolve_inputs(input_path.parent, sub_content, visited)
-            result = result.replace(match.group(0), sub_content)
-        return result
+            next_stack = set(stack)
+            next_stack.add(input_path)
+            return self._resolve_inputs(input_path.parent, sub_content, next_stack)
+
+        return pattern.sub(_replace, tex_content)
 
     def _extract_latex_citations(self, body: str) -> List[Citation]:
         """Extract \\cite{} markers and their contexts."""

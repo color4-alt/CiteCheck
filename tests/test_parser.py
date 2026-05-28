@@ -210,3 +210,4 @@ def test_resolve_nested_input_and_avoid_self_recursion(tmp_path):
     assert len(paper.citations) == 1
     assert paper.citations[0].bib_keys == ["k1"]
     assert paper.citations[0].ref_indices == [1]
+    assert "\\input{section1}" not in paper.body_text
